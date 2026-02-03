@@ -3,6 +3,7 @@ import requests
 import urllib.parse
 from gnews import GNews
 from instagrapi import Client
+from __future__ import annotations
 
 def run_bot():
     # 1. Get News
