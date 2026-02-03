@@ -1,0 +1,19 @@
+name: Daily Post
+on:
+  schedule:
+    - cron: '0 10 * * *' # Runs at 10 AM UTC daily
+  workflow_dispatch:
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+      - name: Install Tools
+        run: pip install -r requirements.txt
+      - name: Run Script
+        env:
+          INSTA_USER: ${{ secrets.INSTA_USER }}
+          INSTA_PASS: ${{ secrets.INSTA_PASS }}
+        run: python main.py
