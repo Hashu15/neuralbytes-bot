@@ -1,15 +1,19 @@
-name: Daily Post
+name: NeuralBytes Automation
 on:
+  workflow_dispatch: # This adds the "Manual Run" button
   schedule:
-    - cron: '0 10 * * *' # Runs at 10 AM UTC daily
-  workflow_dispatch:
+    - cron: '0 12 * * *' # Runs daily at 12:00 PM UTC
+
 jobs:
-  post:
+  post-to-insta:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
+      - name: Checkout Code
+        uses: actions/checkout@v3
+      - name: Setup Python
         uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
       - name: Install Tools
         run: pip install -r requirements.txt
       - name: Run Script
