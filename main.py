@@ -2,69 +2,67 @@ import os
 import time
 import requests
 import urllib.parse
+import re
 from gnews import GNews
 from instagrapi import Client
-from PIL import Image  # This verifies if the image is real
+from PIL import Image
+
+def clean_prompt(text):
+    # Remove special characters like quotes, dashes, and parentheses
+    clean = re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    # Limit to the first 15 words to keep the URL short and safe
+    return " ".join(clean.split()[:15])
 
 def run_bot():
     cl = Client()
     
-    # 1. LOAD SESSION (The Golden Key)
+    # 1. LOAD SESSION
     if os.path.exists("session.json"):
-        try:
-            cl.load_settings("session.json")
-            print("✅ Session loaded.")
-        except Exception as e:
-            print(f"❌ Could not load session file: {e}")
-            return
+        cl.load_settings("session.json")
+        print("✅ Session loaded.")
     else:
-        print("❌ Error: session.json not found! Upload it to GitHub first.")
+        print("❌ session.json missing.")
         return
 
-    # 2. GET LATEST AI NEWS
+    # 2. GET NEWS
     gn = GNews(language='en', period='1d', max_results=1)
     news = gn.get_news('Artificial Intelligence')
     
     if news:
-        headline = news[0]['title']
+        raw_headline = news[0]['title']
+        # Remove the source (e.g., "- The Motley Fool") from the headline
+        headline = raw_headline.split(' - ')[0]
         print(f"📰 News Found: {headline}")
     else:
-        headline = "AI is transforming the digital landscape today."
-        print("⚠️ No news found, using default headline.")
+        headline = "AI technology is advancing rapidly today"
+        print("⚠️ Default headline used.")
 
-    # 3. GENERATE & VERIFY IMAGE
-    # We use a 1:1 square ratio (1024x1024) which Instagram loves
-    prompt = urllib.parse.quote(f"{headline}, futuristic digital art, cinematic lighting, 8k, detailed")
-    image_url = f"https://image.pollinations.ai/prompt/{prompt}?width=1024&height=1024&nologo=true"
+    # 3. GENERATE IMAGE (The Fixed Part)
+    # We clean the headline to make it a safe prompt
+    safe_prompt = clean_prompt(headline)
+    encoded_prompt = urllib.parse.quote(f"{safe_prompt}, futuristic digital art, 8k")
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true"
     
     try:
-        img_data = requests.get(image_url, timeout=30).content
-        with open("post.jpg", "wb") as handler:
-            handler.write(img_data)
+        print(f"🎨 Requesting image for: {safe_prompt}")
+        response = requests.get(image_url, timeout=30)
+        with open("post.jpg", "wb") as f:
+            f.write(response.content)
         
-        # SAFETY CHECK: Use PIL to see if this is actually an image
+        # Verify the image is real
         with Image.open("post.jpg") as img:
             img.verify()
-        print("✅ Image verified as valid JPEG.")
+        print("✅ Image verified.")
     except Exception as e:
-        print(f"❌ Image Error: The file downloaded is not a valid image. Error: {e}")
+        print(f"❌ Image Error: {e}")
         return
 
-    # 4. POST TO INSTAGRAM (Safe Mode)
+    # 4. POST TO INSTAGRAM
     try:
-        # Add a small human-like delay
-        time.sleep(10)
-        
-        caption = (
-            f"🚀 AI UPDATE: {headline}\n\n"
-            f"Follow @neuralbytes2026 for daily AI insights! 🤖\n\n"
-            f"#AI #TechNews #NeuralBytes #ArtificialIntelligence #MachineLearning"
-        )
-        
-        # The actual upload
+        time.sleep(5)
+        caption = f"🚀 AI NEWS: {headline}\n\nFollow @neuralbytes2026 for more! 🤖\n\n#AI #Tech #NeuralBytes"
         media = cl.photo_upload("post.jpg", caption)
-        print(f"🎉 SUCCESS! Post is live: https://www.instagram.com/p/{media.code}/")
-        
+        print(f"🎉 SUCCESS! Live at: https://www.instagram.com/p/{media.code}/")
     except Exception as e:
         print(f"❌ Upload failed: {e}")
 
