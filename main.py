@@ -6,11 +6,13 @@ import re
 from gnews import GNews
 from instagrapi import Client
 from PIL import Image
+from io import BytesIO
 
 def clean_prompt(text):
-    # Sanitize the headline: remove special characters and keep it short
+    # Remove all non-alphanumeric characters for a stable URL
     clean = re.sub(r'[^a-zA-Z0-9\s]', '', text)
-    return " ".join(clean.split()[:12]) # Limit to 12 words for a clean URL
+    # Pollinations works best with prompts under 75 characters
+    return " ".join(clean.split()[:10])
 
 def run_bot():
     cl = Client()
@@ -20,49 +22,46 @@ def run_bot():
         cl.load_settings("session.json")
         print("✅ Session loaded.")
     else:
-        print("❌ Error: session.json missing.")
+        print("❌ session.json missing.")
         return
 
-    # 2. Fetch News
+    # 2. Get News
     gn = GNews(language='en', period='1d', max_results=1)
     news = gn.get_news('Artificial Intelligence')
-    
-    if news:
-        # Clean headline (removes source like "- The Motley Fool")
-        headline = news[0]['title'].split(' - ')[0]
-        print(f"📰 News Found: {headline}")
-    else:
-        headline = "AI technology is evolving rapidly today"
+    headline = news[0]['title'].split(' - ')[0] if news else "AI Innovation Today"
+    print(f"📰 News: {headline}")
 
-    # 3. Generate Image with URL Sanitization
+    # 3. Robust Image Generation
     prompt = clean_prompt(headline)
-    encoded_prompt = urllib.parse.quote(f"{prompt}, cinematic digital art, 8k")
-    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1080&nologo=true"
+    # Using 'flux' model for higher reliability
+    encoded_prompt = urllib.parse.quote(f"{prompt} futuristic digital art 8k")
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1080&nologo=true&model=flux"
     
     try:
-        print(f"🎨 Generating image for: {prompt}")
-        response = requests.get(image_url, timeout=30)
+        print(f"🎨 Requesting: {image_url}")
+        # Add a real browser header to prevent being blocked as a bot
+        response = requests.get(image_url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=30)
         
-        # Save the file
-        with open("post.jpg", "wb") as f:
-            f.write(response.content)
-            
-        # VERIFICATION: Check if it's actually an image
-        with Image.open("post.jpg") as img:
-            img.verify()
-        print("✅ Image verified as valid JPEG.")
+        if response.status_code != 200:
+            print(f"❌ API Error: {response.status_code}")
+            return
+
+        # Use BytesIO to verify the image in memory before saving
+        img = Image.open(BytesIO(response.content))
+        img.convert('RGB').save('post.jpg', 'JPEG')
+        print("✅ Image verified and saved.")
         
     except Exception as e:
         print(f"❌ Image Error: {e}")
-        # If image fails, do not proceed to upload to avoid banning
         return
 
-    # 4. Upload to Instagram
+    # 4. Post with Fail-Safe
     try:
-        # Standardize format and size for Instagram
-        caption = f"🚀 AI NEWS: {headline}\n\nStay updated with @neuralbytes2026 🤖\n\n#AI #NeuralBytes #TechNews"
+        # Avoid 'checkpoint' by waiting 5 seconds
+        time.sleep(5)
+        caption = f"🚀 AI UPDATE: {headline}\n\nStay ahead with @neuralbytes2026 🤖\n\n#AI #TechNews #NeuralBytes"
         media = cl.photo_upload("post.jpg", caption)
-        print(f"🎉 SUCCESS! Live at: https://www.instagram.com/p/{media.code}/")
+        print(f"🎉 SUCCESS! https://www.instagram.com/p/{media.code}/")
     except Exception as e:
         print(f"❌ Upload failed: {e}")
 
